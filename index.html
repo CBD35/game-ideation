@@ -1,7 +1,76 @@
-<h1>My Game Collection</h1>
-<ul>
-    <li><a href="game1.html">Play The Call of The Void</a></li>
-    <li><a href="game2.html">Play Kingdom Quiz</a></li>
-    <li><a href="game3.html">Play Clicker</a></li>
-    <li><a href="game4.html">Play Gold of a Dragon</a></li>
-</ul>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CB's Gaming Creations</title>
+    <style>
+        /* This sets the dark reddish-black background and centers everything */
+        body {
+            background: linear-gradient(135deg, #330000, #000000, #1a0000);
+            color: #d4af37; /* Goldish lettering */
+            font-family: 'Georgia', serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+
+        /* Styling for the main title */
+        h1 {
+            font-size: 3.5rem;
+            color: #ffd700; /* Brighter gold for the header */
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+            margin-bottom: 40px;
+        }
+
+        /* Removes the default bullet points from the list */
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        /* Adds spacing between the buttons */
+        li {
+            margin: 20px 0;
+        }
+
+        /* Styling the clickable links to look like gold-framed buttons */
+        a {
+            text-decoration: none;
+            color: #d4af37;
+            font-size: 1.5rem;
+            border: 2px solid #d4af37;
+            padding: 15px 30px;
+            border-radius: 8px;
+            display: inline-block;
+            width: 320px;
+            background-color: rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease;
+        }
+
+        /* Adds a cool inverted effect when you hover over the games */
+        a:hover {
+            background-color: #d4af37;
+            color: #330000; /* Dark red text on hover */
+            transform: scale(1.05); /* Slightly enlarges the button */
+            box-shadow: 0px 0px 15px #d4af37; /* Gold glowing shadow */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CB's Gaming Creations</h1>
+    
+    <ul>
+        <li><a href="game1.html">Play The Call of The Void</a></li>
+        <li><a href="game2.html">Play Kingdom Quiz</a></li>
+        <li><a href="game3.html">Play Clicker</a></li>
+        <li><a href="game4.html">Play Gold of a Dragon</a></li>
+    </ul>
+
+</body>
+</html>
