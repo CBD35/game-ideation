@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gold Clicker</title>
+  <style>
+    body {
+      background: #2dbe0c;
+      color: #f0f405;
+      font-family: Georgia, serif;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 { font-size: 48px; margin-bottom: 4px; }
+    p  { color: #080808; margin-bottom: 30px; }
+
+    #click-btn {
+      background: #92886b;
+      color: #e32b2b;
+      border: none;
+      padding: 20px 50px;
+      font-size: 22px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    #click-btn:hover { background: #f0d080; }
+
+    #shop {
+      margin-top: 40px;
+      display: inline-block;
+      text-align: left;
+    }
+    .upgrade {
+      background: #0f64c5;
+      border: 1px solid #b32379;
+      border-radius: 8px;
+      padding: 16px 24px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      width: 320px;
+    }
+    .upgrade:hover { border-color: #c9a84c; }
+    .upgrade h3 { margin: 0 0 4px; font-size: 16px; }
+    .upgrade p  { margin: 0; font-size: 13px; color: #888; }
+  </style>
+</head>
+<body>
+
+  <h1>🪙 <span id="gold">0</span> Gold</h1>
+  <p id="per-click-display">+1 per click</p>
+
+  <button id="click-btn" onclick="mine()">⛏ Mine Gold</button>
+
+  <div id="shop">
+    <div class="upgrade" onclick="buyUpgrade(1)">
+      <h3>🪓 Better Pickaxe — <span id="cost-1">50</span> Gold</h3>
+      <p>+1 gold per click (owned: <span id="owned-1">0</span>)</p>
+    </div>
+    <div class="upgrade" onclick="buyUpgrade(2)">
+      <h3>⚙️ Auto Miner — <span id="cost-2">200</span> Gold</h3>
+      <p>Earns 1 gold per second automatically (owned: <span id="owned-2">0</span>)</p>
+    </div>
+    <div class="upgrade" onclick="buyUpgrade(3)">
+      <h3>🏰 Gold Mine — <span id="cost-3">1000</span> Gold</h3>
+      <p>Earns 5 gold per second automatically (owned: <span id="owned-3">0</span>)</p>
+    </div>
+    <div class="upgrade" onclick="buyUpgrade(4)">
+      <h3>🐉 Dragon Hoard - <span id="cost-4">5000</span> Gold</h3>
+      <p>Earns 20 gold per second automatically (owned: <span id="owned-4">0</span>)</p>
+    </div>
+  </div>
+
+  <script>
+    // --- THE DATA ---
+    let gold = 0;
+    let perClick = 1;
+    let perSecond = 0;
+
+    let upgrades = [
+      { id: 1, name: "Pickaxe", cost: 50,   owned: 0, effect: "click",  power: 1  },
+      { id: 2, name: "Miner",   cost: 200,  owned: 0, effect: "second", power: 1  },
+      { id: 3, name: "Mine",    cost: 1000, owned: 0, effect: "second", power: 5  },
+      { id: 4, name: "Dragon", cost: 5000, owned: 0, effect: "second", power: 20},
+    ];
+
+    // --- THE ACTIONS ---
+    function mine() {
+      gold = gold + perClick;
+      updateScreen();
+    }
+
+    function buyUpgrade(id) {
+      let upgrade = upgrades[id - 1];
+
+      if (gold < upgrade.cost) {
+        alert("Not enough gold!");
+        return;
+      }
+
+      gold = gold - upgrade.cost;
+      upgrade.owned = upgrade.owned + 1;
+      upgrade.cost = Math.floor(upgrade.cost * 1.5); // gets more expensive each time
+
+      if (upgrade.effect === "click") {
+        perClick = perClick + upgrade.power;
+      } else {
+        perSecond = perSecond + upgrade.power;
+      }
+
+      updateScreen();
+    }
+
+    // --- UPDATE WHAT THE PLAYER SEES ---
+    function updateScreen() {
+      document.getElementById('gold').textContent = gold;
+      document.getElementById('per-click-display').textContent = '+' + perClick + ' per click · +' + perSecond + '/sec auto';
+
+      for (let u of upgrades) {
+        document.getElementById('cost-' + u.id).textContent = u.cost;
+        document.getElementById('owned-' + u.id).textContent = u.owned;
+      }
+    }
+
+    // --- AUTO MINER (runs every second) ---
+    setInterval(function() {
+      gold = gold + perSecond;
+      updateScreen();
+    }, 1000);
+
+  </script>
+</body>
+</html>

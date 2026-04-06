@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>My score: <span id="score">0</span></h1>
+  <button onclick="addPoint()">Click me</button>
+
+  <script>
+    let score = 0;
+    function addPoint() {
+      score = score + 1;
+      document.getElementById('score').textContent = score;
+    }
+  </script>
+</body>
+</html>
