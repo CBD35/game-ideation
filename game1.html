@@ -561,6 +561,190 @@
 
 <script>
 // =====================================================================
+// SOUND ENGINE
+// =====================================================================
+// How this works — a short explanation:
+//
+// audioCtx is our "sound studio" — one shared instance for the whole game.
+// We create it lazily (on first user interaction) because browsers block
+// audio until the player has clicked or tapped something.
+//
+// Every sound follows the same three-step chain:
+//   oscillator → gainNode → audioCtx.destination (speakers)
+//
+// The oscillator generates a raw tone at a chosen frequency and wave shape.
+// The gainNode controls volume and the "envelope" — how volume rises
+// and falls over time. That shaping is what makes sounds feel different
+// rather than all sounding like dial tones.
+//
+// setValueAtTime sets the volume at a moment in time.
+// exponentialRampToValueAtTime fades it smoothly (exponential because
+// human hearing is logarithmic — linear fades sound unnatural).
+//
+// ctx.currentTime is the audio clock in seconds from when the
+// AudioContext was created. Adding 0.1 means "0.1 seconds from now".
+// =====================================================================
+ 
+let audioCtx = null;
+ 
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+ 
+function sfx(type) {
+  initAudio();
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+ 
+  // Helper: builds one oscillator+gain and plays it.
+  // freq=pitch(Hz), wave=waveShape, vol=peak volume(0-1),
+  // attack=seconds to reach peak, duration=total length,
+  // startFreq/endFreq=optional pitch sweep
+  function tone(freq, wave, vol, attack, duration, startFreq, endFreq) {
+    let osc  = ctx.createOscillator();
+    let gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = wave;
+    if (startFreq && endFreq) {
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
+    } else {
+      osc.frequency.value = freq;
+    }
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(vol, now + attack);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+  }
+ 
+  switch(type) {
+    // UI
+    case 'click':
+      // Soft triangle blip — gentle enough for every button press
+      tone(440, 'triangle', 0.12, 0.005, 0.08);
+      break;
+    case 'select':
+      // Two ascending tones — confirms a meaningful selection
+      tone(520, 'sine', 0.14, 0.005, 0.10);
+      setTimeout(() => tone(660, 'sine', 0.10, 0.005, 0.10), 80);
+      break;
+ 
+    // BATTLE ACTIONS
+    case 'attack':
+      // Sawtooth sweeps DOWN (280→120) — whoosh and thud of a blade.
+      // Sawtooth is harsh because it contains many harmonics, like metal.
+      tone(null, 'sawtooth', 0.22, 0.002, 0.18, 280, 120);
+      break;
+    case 'spell':
+      // Sine sweeps UP (120→800) — arcane energy building and releasing.
+      // Second tone fades out behind it for depth.
+      tone(null, 'sine', 0.18, 0.01, 0.25, 120, 800);
+      setTimeout(() => tone(400, 'sine', 0.10, 0.005, 0.30), 100);
+      break;
+    case 'heal':
+      // Warm bloom — slow attack so it "opens up" rather than snapping.
+      // Two harmonics layered make it sound fuller and more magical.
+      tone(660, 'sine', 0.14, 0.05, 0.40);
+      setTimeout(() => tone(880, 'sine', 0.08, 0.05, 0.35), 50);
+      break;
+    case 'block':
+      // Square wave = metallic character. Short and flat = shield clank.
+      tone(180, 'square', 0.18, 0.002, 0.12);
+      break;
+ 
+    // DAMAGE
+    case 'hit-taken':
+      // Lower and heavier than attack — you feel it land on you.
+      tone(null, 'sawtooth', 0.25, 0.002, 0.22, 220, 80);
+      break;
+    case 'void-pulse':
+      // The Void Lord's special. Deep rumble (55Hz) + shrieking sweep.
+      // Combined they create an unsettling, unstoppable feeling.
+      tone(55, 'sine', 0.30, 0.01, 0.60);
+      tone(null, 'sawtooth', 0.15, 0.005, 0.35, 800, 200);
+      break;
+ 
+    // STATUS EFFECTS
+    case 'stun':
+      // Three descending zaps in quick succession = electric shock.
+      tone(800, 'square', 0.12, 0.002, 0.08);
+      setTimeout(() => tone(600, 'square', 0.10, 0.002, 0.08), 90);
+      setTimeout(() => tone(400, 'square', 0.08, 0.002, 0.10), 180);
+      break;
+    case 'poison':
+      // Two short hisses — venomous and slightly wrong-feeling.
+      tone(600, 'sawtooth', 0.10, 0.002, 0.12);
+      setTimeout(() => tone(550, 'sawtooth', 0.08, 0.002, 0.12), 120);
+      break;
+    case 'enemy-heal':
+      // Similar to heal but lower and minor — sinister regeneration.
+      tone(440, 'sine', 0.12, 0.04, 0.35);
+      setTimeout(() => tone(523, 'sine', 0.07, 0.04, 0.30), 60);
+      break;
+ 
+    // PROGRESSION
+    case 'levelup':
+      // Four ascending notes — classic RPG level-up fanfare.
+      // Each note is slightly louder, giving a "building" feel.
+      tone(440, 'sine', 0.14, 0.01, 0.18);
+      setTimeout(() => tone(550, 'sine', 0.16, 0.01, 0.18), 160);
+      setTimeout(() => tone(660, 'sine', 0.18, 0.01, 0.18), 320);
+      setTimeout(() => tone(880, 'sine', 0.22, 0.01, 0.35), 480);
+      break;
+    case 'skill-unlock':
+      // Three triangle tones, slow attack — magical and earned.
+      tone(520, 'triangle', 0.15, 0.03, 0.30);
+      setTimeout(() => tone(780, 'triangle', 0.12, 0.03, 0.40), 200);
+      setTimeout(() => tone(1040,'sine',     0.10, 0.03, 0.50), 400);
+      break;
+    case 'equip':
+      // Quick square blip then a cleaner sine — the "click" of metal
+      // slotting into place.
+      tone(350, 'square',   0.14, 0.002, 0.08);
+      setTimeout(() => tone(520, 'triangle', 0.12, 0.01, 0.20), 60);
+      break;
+ 
+    // OUTCOMES
+    case 'victory':
+      // Ascending major chord played in sequence, top note held.
+      // Major = happy resolution. Sequence = earned, not instant.
+      tone(330, 'sine', 0.14, 0.01, 0.25);
+      setTimeout(() => tone(415, 'sine', 0.14, 0.01, 0.25), 200);
+      setTimeout(() => tone(495, 'sine', 0.14, 0.01, 0.25), 400);
+      setTimeout(() => tone(660, 'sine', 0.18, 0.01, 0.55), 600);
+      break;
+    case 'defeat':
+      // Descending minor — hope draining away. Opposite of victory.
+      tone(440, 'sine', 0.16, 0.02, 0.35);
+      setTimeout(() => tone(370, 'sine', 0.14, 0.02, 0.35), 300);
+      setTimeout(() => tone(294, 'sine', 0.12, 0.02, 0.35), 600);
+      setTimeout(() => tone(220, 'sine', 0.10, 0.02, 0.70), 900);
+      break;
+    case 'gameclear':
+      // Full ascending phrase then a held chord — the kingdom is saved.
+      // Most elaborate sound in the game, reserved for the true ending.
+      tone(330, 'sine', 0.14, 0.01, 0.20);
+      setTimeout(() => tone(440, 'sine', 0.15, 0.01, 0.20), 180);
+      setTimeout(() => tone(550, 'sine', 0.16, 0.01, 0.20), 360);
+      setTimeout(() => tone(660, 'sine', 0.17, 0.01, 0.20), 540);
+      setTimeout(() => tone(880, 'sine', 0.20, 0.02, 0.80), 720);
+      setTimeout(() => tone(660, 'sine', 0.14, 0.02, 0.70), 780);
+      setTimeout(() => tone(550, 'sine', 0.12, 0.02, 0.60), 840);
+      break;
+    case 'boss-appear':
+      // Deep descending sweep + low sine rumble = ominous and heavy.
+      tone(null, 'sawtooth', 0.20, 0.01, 0.70, 600, 60);
+      setTimeout(() => tone(80, 'sine', 0.25, 0.05, 0.80), 200);
+      break;
+  }
+}
+// =====================================================================
 // DATA
 // =====================================================================
 // =====================================================================
@@ -1640,6 +1824,26 @@ function shuffleArr(a){
   for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
   return a;
 }
+  
+// =====================================================================
+// GLOBAL SOUNDS
+// =====================================================================
+// A single event listener on the document catches every button click.
+// We play 'click' for ghost/outline buttons and let specific actions
+// play their own sounds (attack, spell, etc.) — so we don't double-up.
+// This also initialises the AudioContext on first interaction,
+// satisfying the browser's "user gesture" requirement.
+document.addEventListener('click', function(e) {
+  let btn = e.target.closest('button');
+  if (!btn) return;
+  initAudio(); // ensure context is alive
+  // Only play the generic click for nav/UI buttons
+  // Battle action buttons play their own specific sounds
+  let actionIds = ['btn-attack','btn-spell','btn-heal'];
+  if (!actionIds.includes(btn.id) && !btn.classList.contains('skill-card')) {
+    sfx('click');
+  }
+});
 
 // Populate hero select portraits on load
 document.getElementById('hport-0').innerHTML = HERO_PORTRAITS[0];
