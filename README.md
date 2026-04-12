@@ -53,6 +53,6 @@ Technical Notes
 All games are single HTML files. No frameworks, no build tools, no dependencies. Open in any browser and they run. Sound effects use the Web Audio API — no audio files are loaded, everything is generated in code.
 To try any game: download the file and open it in Chrome or Safari.
 
-Contact
+
 Built in Israel, 2025.
 Open to opportunities in tech, defense, or any organisation that values creative problem-solving and a willingness to learn.
