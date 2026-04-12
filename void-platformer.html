@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Call of the Void — Escape</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #05080f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: Georgia, serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #game-title {
+      color: #c9a84c;
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    #canvas-wrap {
+      position: relative;
+      border: 2px solid #2a3545;
+      border-radius: 4px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    canvas {
+      display: block;
+      /* Pixel art stays sharp */
+      image-rendering: pixelated;
+    }
+
+    /* HUD overlay sits on top of the canvas */
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 10px 14px;
+      pointer-events: none;
+    }
+
+    .hud-block { display: flex; flex-direction: column; gap: 3px; }
+
+    .hud-label {
+      font-size: 10px;
+      color: #6a7f94;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .hud-val {
+      font-size: 15px;
+      color: #f0d080;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    /* HP bar */
+    #hp-wrap {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    #hp-bar-bg {
+      width: 100px; height: 7px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px; overflow: hidden;
+    }
+    #hp-bar {
+      height: 7px; border-radius: 3px;
+      background: linear-gradient(90deg, #c0392b, #2ecc71);
+      transition: width 0.2s;
+      width: 100%;
+    }
+
+    /* Mobile controls */
+    #mobile-controls {
+      display: none;
+      margin-top: 10px;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 560px;
+      padding: 0 8px;
+    }
+
+    .ctrl-group { display: flex; gap: 6px; }
+
+    .ctrl-btn {
+      width: 56px; height: 56px;
+      background: rgba(201,168,76,0.12);
+      border: 2px solid rgba(201,168,76,0.3);
+      border-radius: 10px;
+      color: #f0d080;
+      font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      transition: background 0.1s;
+    }
+    .ctrl-btn:active { background: rgba(201,168,76,0.3); }
+
+    @media (pointer: coarse) {
+      #mobile-controls { display: flex; }
+    }
+
+    /* Screens */
+    #screen-start, #screen-dead, #screen-win {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5,8,15,0.88);
+      border-radius: 2px;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .screen-title {
+      font-size: 24px;
+      color: #f0d080;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .screen-sub {
+      font-size: 13px;
+      color: #6a7f94;
+      font-style: italic;
+      line-height: 1.7;
+      max-width: 340px;
+      margin-bottom: 10px;
+    }
+
+    .screen-btn {
+      background: linear-gradient(135deg, #c9a84c, #a07828);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-family: Georgia, serif;
+      font-size: 14px;
+      font-weight: bold;
+      padding: 12px 28px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .screen-btn:hover { filter: brightness(1.1); }
+
+    .key-hints {
+      font-size: 11px;
+      color: #2a3545;
+      margin-top: 6px;
+    }
+
+    #screen-dead { display: none; }
+    #screen-win  { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="game-title">☠ The Call of the Void — Escape from Gyona</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="hp-wrap">
+      <div class="hud-label">HP</div>
+      <div id="hp-bar-bg"><div id="hp-bar"></div></div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">Score</div>
+      <div class="hud-val" id="hud-score">0</div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">Coins</div>
+      <div class="hud-val" id="hud-coins">0</div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">Level</div>
+      <div class="hud-val" id="hud-level">1</div>
+    </div>
+  </div>
+
+  <!-- START SCREEN -->
+  <div id="screen-start">
+    <div class="screen-title">☠ Escape from Gyona</div>
+    <div class="screen-sub">
+      The Void has consumed the kingdom. Run, jump, and fight through the
+      corrupted lands. Collect soul fragments. Survive the darkness.
+    </div>
+    <button class="screen-btn" onclick="startGame()">Begin the Escape</button>
+    <div class="key-hints">Arrow keys or WASD to move · Space or ↑ to jump · X or Z to attack</div>
+  </div>
+
+  <!-- DEAD SCREEN -->
+  <div id="screen-dead">
+    <div class="screen-title">💀 Consumed by the Void</div>
+    <div class="screen-sub" id="dead-sub">You fell.</div>
+    <button class="screen-btn" onclick="startGame()">Try Again</button>
+  </div>
+
+  <!-- WIN SCREEN -->
+  <div id="screen-win">
+    <div class="screen-title">👑 Escaped!</div>
+    <div class="screen-sub" id="win-sub">You escaped the corrupted lands.</div>
+    <button class="screen-btn" onclick="startGame()">Play Again</button>
+  </div>
+
+</div><!-- end canvas-wrap -->
+
+<!-- MOBILE CONTROLS -->
+<div id="mobile-controls">
+  <div class="ctrl-group">
+    <div class="ctrl-btn" id="btn-left">◀</div>
+    <div class="ctrl-btn" id="btn-right">▶</div>
+  </div>
+  <div class="ctrl-btn" id="btn-attack">⚔</div>
+  <div class="ctrl-btn" id="btn-jump">▲</div>
+</div>
+
+<script>
+
+// =====================================================================
+// HOW THIS WORKS — READ THIS FIRST
+// =====================================================================
+//
+// This game runs on an HTML5 Canvas — a blank rectangle the browser
+// gives us that we can draw anything on using 2D drawing commands.
+//
+// ctx.fillRect(x, y, width, height) — draws a solid rectangle
+// ctx.fillStyle = '#color'          — sets the current colour
+// ctx.clearRect(...)                — erases an area
+//
+// The GAME LOOP runs 60 times per second using requestAnimationFrame.
+// Each frame does two things:
+//   1. update() — move everything, check collisions, apply physics
+//   2. draw()   — repaint the entire canvas from scratch
+//
+// PHYSICS works like this:
+//   player.velY += GRAVITY   (gravity pulls you down every frame)
+//   player.x   += player.velX (position changes by velocity)
+//   player.y   += player.velY
+//   When you land on a platform, velY is set to 0 and y is corrected.
+//
+// COLLISION: two rectangles overlap when none of these is true:
+//   left edge of A is past right edge of B
+//   right edge of A is before left edge of B
+//   top of A is below bottom of B
+//   bottom of A is above top of B
+//
+// CAMERA: the camera follows the player by offsetting everything drawn.
+//   We draw objects at (obj.x - camera.x) so the world scrolls.
+// =====================================================================
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// ---- CANVAS SIZE ----
+// We size the canvas to fit the screen, max 560×360
+const IDEAL_W = 560;
+const IDEAL_H = 320;
+
+function resizeCanvas() {
+  let w = Math.min(window.innerWidth - 16, IDEAL_W);
+  let h = Math.round(w * (IDEAL_H / IDEAL_W));
+  canvas.width  = w;
+  canvas.height = h;
+  SCALE = w / IDEAL_W;
+}
+
+let SCALE = 1;
+resizeCanvas();
+
+// ---- CONSTANTS ----
+const GRAVITY    = 0.45;  // added to velY every frame — pulls the player down
+const JUMP_FORCE = -10.5; // negative because Y increases downward in canvas coords
+const MOVE_SPEED = 3.2;
+const TILE       = 32;    // size of one map tile in game units
+
+// ---- INPUT ----
+// We track which keys are currently held down.
+// This is better than listening for keydown events directly because
+// it lets us check input every frame in update(), not just when a key changes.
+const keys = {};
+const mobileButtons = { left:false, right:false, jump:false, attack:false };
+
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  // Prevent arrow keys from scrolling the page
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))
+    e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Mobile button setup — we use touchstart/touchend for responsiveness
+function mobileBtn(id, prop) {
+  let el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', e => { e.preventDefault(); mobileButtons[prop] = true; });
+  el.addEventListener('touchend',   e => { e.preventDefault(); mobileButtons[prop] = false; });
+  el.addEventListener('mousedown',  e => { mobileButtons[prop] = true; });
+  el.addEventListener('mouseup',    e => { mobileButtons[prop] = false; });
+}
+mobileBtn('btn-left',   'left');
+mobileBtn('btn-right',  'right');
+mobileBtn('btn-jump',   'jump');
+mobileBtn('btn-attack', 'attack');
+
+function pressing(left, right, jump, attack) {
+  return {
+    left:   keys['ArrowLeft']  || keys['KeyA'] || mobileButtons.left,
+    right:  keys['ArrowRight'] || keys['KeyD'] || mobileButtons.right,
+    jump:   keys['ArrowUp'] || keys['KeyW'] || keys['Space'] || mobileButtons.jump,
+    attack: keys['KeyX'] || keys['KeyZ'] || mobileButtons.attack,
+  };
+}
+
+// ---- AUDIO ----
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function sfx(type) {
+  initAudio();
+  if (!audioCtx) return;
+  const ctx2 = audioCtx, now = ctx2.currentTime;
+
+  function tone(freq, wave, vol, attack, dur, f0, f1) {
+    let o = ctx2.createOscillator(), g = ctx2.createGain();
+    o.connect(g); g.connect(ctx2.destination);
+    o.type = wave;
+    if (f0 && f1) {
+      o.frequency.setValueAtTime(f0, now);
+      o.frequency.exponentialRampToValueAtTime(f1, now + dur);
+    } else o.frequency.value = freq;
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.linearRampToValueAtTime(vol, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    o.start(now); o.stop(now + dur + 0.05);
+  }
+
+  switch(type) {
+    case 'jump':
+      // Quick upward pitch sweep — the classic video game jump sound
+      tone(null, 'square', 0.15, 0.005, 0.18, 220, 440); break;
+    case 'land':
+      tone(null, 'triangle', 0.12, 0.002, 0.12, 200, 100); break;
+    case 'coin':
+      tone(880, 'sine', 0.18, 0.005, 0.12);
+      setTimeout(() => tone(1100, 'sine', 0.14, 0.005, 0.15), 80); break;
+    case 'attack':
+      tone(null, 'sawtooth', 0.20, 0.002, 0.14, 300, 120); break;
+    case 'hit-enemy':
+      tone(null, 'square', 0.18, 0.002, 0.12, 400, 150); break;
+    case 'hit-player':
+      tone(null, 'sawtooth', 0.22, 0.002, 0.20, 200, 80); break;
+    case 'die':
+      tone(440, 'sine', 0.15, 0.01, 0.25);
+      setTimeout(() => tone(330, 'sine', 0.12, 0.01, 0.30), 220);
+      setTimeout(() => tone(220, 'sine', 0.10, 0.01, 0.50), 440); break;
+    case 'level-complete':
+      tone(440, 'sine', 0.14, 0.01, 0.18);
+      setTimeout(() => tone(550, 'sine', 0.16, 0.01, 0.18), 150);
+      setTimeout(() => tone(660, 'sine', 0.18, 0.01, 0.18), 300);
+      setTimeout(() => tone(880, 'sine', 0.22, 0.01, 0.40), 450); break;
+    case 'powerup':
+      tone(520, 'triangle', 0.15, 0.02, 0.25);
+      setTimeout(() => tone(660, 'triangle', 0.15, 0.02, 0.25), 180);
+      setTimeout(() => tone(880, 'triangle', 0.15, 0.02, 0.35), 360); break;
+  }
+}
+
+// ---- GAME STATE ----
+let state      = 'start';  // 'start' | 'playing' | 'dead' | 'win'
+let score      = 0;
+let coinsTotal = 0;
+let currentLevel = 0;
+
+// ---- PLAYER ----
+let player = {};
+
+function resetPlayer(startX, startY) {
+  player = {
+    x: startX,
+    y: startY,
+    w: 20,       // width in game units
+    h: 28,       // height in game units
+    velX: 0,
+    velY: 0,
+    onGround: false,
+    facingRight: true,
+    hp: 5,
+    maxHp: 5,
+    invincible: 0,    // frames of invincibility after taking damage
+    attackTimer: 0,   // frames the attack hitbox stays active
+    attackCooldown: 0,
+    jumpBuffer: 0,    // allows jump input slightly before landing (coyote time)
+    wasOnGround: false,
+  };
+}
+
+// ---- CAMERA ----
+let camera = { x: 0, y: 0 };
+
+// ---- LEVEL DATA ----
+// Each level is defined as:
+//   platforms: [{x, y, w, h, type}]  — solid ground
+//   enemies:   [{x, y, type}]         — spawned creatures
+//   coins:     [{x, y, collected}]    — collectibles
+//   exit:      {x, y, w, h}           — reach this to complete the level
+//   playerStart: {x, y}
+//   bgColor, groundColor               — visual theme
+//   width: total level width
+
+const LEVELS = [
+
+  // =====================
+  // LEVEL 1 — The Forest
+  // =====================
+  {
+    name: "Ashenvale Forest",
+    bgColor:     ['#0a0f08','#0d1a0a'],   // dark green gradient
+    groundColor:  '#1a3a10',
+    platformColor:'#2a5a18',
+    width: 2800,
+    playerStart: { x: 80, y: 200 },
+
+    platforms: [
+      // Ground segments
+      {x:0,    y:270, w:400,  h:50, type:'ground'},
+      {x:430,  y:270, w:300,  h:50, type:'ground'},
+      {x:780,  y:270, w:500,  h:50, type:'ground'},
+      {x:1350, y:270, w:400,  h:50, type:'ground'},
+      {x:1820, y:270, w:300,  h:50, type:'ground'},
+      {x:2200, y:270, w:600,  h:50, type:'ground'},
+      // Floating platforms
+      {x:200,  y:210, w:80,   h:14, type:'platform'},
+      {x:500,  y:195, w:90,   h:14, type:'platform'},
+      {x:650,  y:220, w:70,   h:14, type:'platform'},
+      {x:860,  y:200, w:100,  h:14, type:'platform'},
+      {x:1000, y:175, w:80,   h:14, type:'platform'},
+      {x:1120, y:200, w:90,   h:14, type:'platform'},
+      {x:1250, y:220, w:80,   h:14, type:'platform'},
+      {x:1420, y:195, w:100,  h:14, type:'platform'},
+      {x:1580, y:210, w:80,   h:14, type:'platform'},
+      {x:1700, y:185, w:90,   h:14, type:'platform'},
+      {x:1900, y:200, w:110,  h:14, type:'platform'},
+      {x:2060, y:220, w:80,   h:14, type:'platform'},
+      {x:2160, y:195, w:90,   h:14, type:'platform'},
+    ],
+    enemies: [
+      {x:480,  y:250, type:'goblin'},
+      {x:700,  y:250, type:'goblin'},
+      {x:950,  y:250, type:'goblin'},
+      {x:1100, y:250, type:'goblin'},
+      {x:1400, y:250, type:'goblin'},
+      {x:1500, y:178, type:'goblin'},
+      {x:1700, y:250, type:'goblin'},
+      {x:1950, y:250, type:'goblin'},
+      {x:2100, y:250, type:'goblin'},
+      {x:2350, y:250, type:'troll'},
+    ],
+    coins: [
+      {x:220, y:190},{x:260,y:190},{x:510,y:175},{x:550,y:175},
+      {x:870,y:180},{x:910,y:180},{x:1010,y:155},{x:1050,y:155},
+      {x:1435,y:175},{x:1475,y:175},{x:1590,y:190},{x:1630,y:190},
+      {x:1710,y:165},{x:1750,y:165},{x:1910,y:180},{x:1950,y:180},
+      {x:2070,y:200},{x:2170,y:175},
+    ],
+    exit: {x:2650, y:220, w:40, h:60},
+  },
+
+  // =====================
+  // LEVEL 2 — Iron Pass
+  // =====================
+  {
+    name: "Ironhold Pass",
+    bgColor:     ['#0d0d14','#141420'],
+    groundColor:  '#2a2a40',
+    platformColor:'#383858',
+    width: 3200,
+    playerStart: { x: 80, y: 190 },
+
+    platforms: [
+      {x:0,    y:250, w:350,  h:50, type:'ground'},
+      {x:400,  y:250, w:280,  h:50, type:'ground'},
+      {x:750,  y:250, w:350,  h:50, type:'ground'},
+      {x:1200, y:250, w:300,  h:50, type:'ground'},
+      {x:1600, y:250, w:400,  h:50, type:'ground'},
+      {x:2100, y:250, w:350,  h:50, type:'ground'},
+      {x:2550, y:250, w:650,  h:50, type:'ground'},
+      // Elevated platforms — more vertical challenge
+      {x:150,  y:190, w:80,   h:14, type:'platform'},
+      {x:310,  y:160, w:70,   h:14, type:'platform'},
+      {x:440,  y:180, w:90,   h:14, type:'platform'},
+      {x:580,  y:155, w:80,   h:14, type:'platform'},
+      {x:700,  y:175, w:70,   h:14, type:'platform'},
+      {x:820,  y:155, w:90,   h:14, type:'platform'},
+      {x:960,  y:180, w:80,   h:14, type:'platform'},
+      {x:1100, y:155, w:90,   h:14, type:'platform'},
+      {x:1250, y:175, w:80,   h:14, type:'platform'},
+      {x:1380, y:150, w:100,  h:14, type:'platform'},
+      {x:1530, y:170, w:80,   h:14, type:'platform'},
+      {x:1680, y:150, w:90,   h:14, type:'platform'},
+      {x:1820, y:175, w:80,   h:14, type:'platform'},
+      {x:1960, y:150, w:100,  h:14, type:'platform'},
+      {x:2150, y:175, w:80,   h:14, type:'platform'},
+      {x:2290, y:150, w:90,   h:14, type:'platform'},
+      {x:2420, y:170, w:80,   h:14, type:'platform'},
+      {x:2600, y:155, w:90,   h:14, type:'platform'},
+      {x:2750, y:175, w:80,   h:14, type:'platform'},
+    ],
+    enemies: [
+      {x:300,  y:230, type:'goblin'},
+      {x:480,  y:230, type:'goblin'},
+      {x:600,  y:230, type:'goblin'},
+      {x:650,  y:138, type:'goblin'},
+      {x:860,  y:230, type:'troll'},
+      {x:1000, y:163, type:'goblin'},
+      {x:1150, y:138, type:'goblin'},
+      {x:1400, y:133, type:'troll'},
+      {x:1600, y:230, type:'goblin'},
+      {x:1700, y:133, type:'goblin'},
+      {x:1900, y:133, type:'troll'},
+      {x:2200, y:158, type:'goblin'},
+      {x:2400, y:133, type:'goblin'},
+      {x:2650, y:230, type:'troll'},
+      {x:2900, y:230, type:'troll'},
+      {x:3050, y:230, type:'goblin'},
+    ],
+    coins: [
+      {x:160,y:170},{x:200,y:170},{x:320,y:140},{x:360,y:140},
+      {x:450,y:160},{x:490,y:160},{x:590,y:135},{x:630,y:135},
+      {x:830,y:135},{x:870,y:135},{x:1110,y:135},{x:1150,y:135},
+      {x:1390,y:130},{x:1430,y:130},{x:1690,y:130},{x:1730,y:130},
+      {x:1970,y:130},{x:2010,y:130},{x:2300,y:130},{x:2340,y:130},
+    ],
+    exit: {x:3080, y:190, w:40, h:60},
+  },
+
+];
+
+// ---- LIVE GAME OBJECTS ----
+// We copy level data into live arrays so we can modify them
+// (mark coins collected, remove dead enemies) without changing the original.
+let platforms = [];
+let enemies   = [];
+let coins     = [];
+let exit      = {};
+let particles = [];  // visual effects — sparks, dust
+
+// =====================================================================
+// ENEMY DEFINITIONS
+// Each enemy type has its own movement behaviour.
+// 'goblin' — patrols a range, turns around at edges
+// 'troll'  — slower, bigger, more HP
+// =====================================================================
+const ENEMY_DEFS = {
+  goblin: { w:18, h:22, hp:2, speed:1.2, color:'#4a7a2a', eyeColor:'#c0392b', score:50 },
+  troll:  { w:28, h:34, hp:4, speed:0.7, color:'#2a4a60', eyeColor:'#e67e22', score:150 },
+};
+
+function spawnEnemies(levelData) {
+  return levelData.enemies.map(e => {
+    let def = ENEMY_DEFS[e.type] || ENEMY_DEFS.goblin;
+    return {
+      x:    e.x,
+      y:    e.y - def.h,
+      w:    def.w,
+      h:    def.h,
+      velX: def.speed * (Math.random() > 0.5 ? 1 : -1),
+      velY: 0,
+      hp:   def.hp,
+      maxHp:def.hp,
+      type: e.type,
+      def:  def,
+      onGround: false,
+      startX: e.x,      // patrol range centre
+      patrolRange: 80 + Math.random() * 60,
+      flash: 0,         // frames to flash white when hit
+      alive: true,
+    };
+  });
+}
+
+// =====================================================================
+// LOAD LEVEL
+// =====================================================================
+function loadLevel(idx) {
+  let lvl = LEVELS[idx];
+  platforms = lvl.platforms.map(p => ({ ...p }));
+  enemies   = spawnEnemies(lvl);
+  coins     = lvl.coins.map(c => ({ ...c, w:10, h:10, collected:false, bobOffset: Math.random()*Math.PI*2 }));
+  exit      = { ...lvl.exit, reached: false };
+  camera    = { x: 0, y: 0 };
+  resetPlayer(lvl.playerStart.x, lvl.playerStart.y);
+  document.getElementById('hud-level').textContent = idx + 1;
+}
+
+// =====================================================================
+// COLLISION HELPERS
+// =====================================================================
+
+// Returns true if two rectangles overlap
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w &&
+         a.x + a.w > b.x &&
+         a.y < b.y + b.h &&
+         a.y + a.h > b.y;
+}
+
+// Resolves player vs platform collision.
+// We check each side separately so we can tell which face was hit.
+// This prevents the player from "sticking" to walls when walking off edges.
+function resolvePlayerPlatform(p) {
+  if (!rectsOverlap(player, p)) return;
+
+  // Overlap amounts on each axis
+  let overlapLeft  = (player.x + player.w) - p.x;
+  let overlapRight = (p.x + p.w) - player.x;
+  let overlapTop   = (player.y + player.h) - p.y;
+  let overlapBottom= (p.y + p.h) - player.y;
+
+  // Find the smallest overlap — that's the axis to resolve
+  let minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+  if (minOverlap === overlapTop && player.velY >= 0) {
+    // Landing on top of platform
+    player.y = p.y - player.h;
+    player.velY = 0;
+    if (!player.onGround) sfx('land');
+    player.onGround = true;
+  } else if (minOverlap === overlapBottom && player.velY < 0) {
+    // Hitting the underside (head bump)
+    player.y = p.y + p.h;
+    player.velY = 0;
+  } else if (minOverlap === overlapLeft) {
+    player.x = p.x - player.w;
+    player.velX = 0;
+  } else if (minOverlap === overlapRight) {
+    player.x = p.x + p.w;
+    player.velX = 0;
+  }
+}
+
+// =====================================================================
+// PARTICLES
+// Small visual effects — dust when landing, sparks when hitting enemies.
+// Each particle has position, velocity, size, colour, and a lifetime counter.
+// =====================================================================
+function spawnParticles(x, y, color, count, spread) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      velX: (Math.random() - 0.5) * spread,
+      velY: (Math.random() * -3) - 1,
+      size: 2 + Math.random() * 3,
+      color,
+      life: 20 + Math.random() * 20,
+      maxLife: 40,
+    });
+  }
+}
+
+// =====================================================================
+// UPDATE — runs every frame
+// This is the heart of the game. The order matters:
+// 1. Read input
+// 2. Apply physics to player
+// 3. Resolve collisions
+// 4. Update enemies
+// 5. Check game events (coins, exit, death)
+// =====================================================================
+
+let jumpWasPressed = false; // prevents holding jump from auto-repeating
+
+function update() {
+  if (state !== 'playing') return;
+
+  let input = pressing();
+
+  // ---- PLAYER HORIZONTAL MOVEMENT ----
+  player.velX = 0;
+  if (input.left)  { player.velX = -MOVE_SPEED; player.facingRight = false; }
+  if (input.right) { player.velX =  MOVE_SPEED; player.facingRight = true;  }
+
+  // ---- JUMP ----
+  // jumpBuffer gives a small window before landing to still trigger a jump.
+  // This makes controls feel much more responsive.
+  if (player.onGround) player.jumpBuffer = 8;
+  else if (player.jumpBuffer > 0) player.jumpBuffer--;
+
+  let jumpPressed = input.jump;
+  if (jumpPressed && !jumpWasPressed && player.jumpBuffer > 0) {
+    player.velY   = JUMP_FORCE;
+    player.jumpBuffer = 0;
+    sfx('jump');
+  }
+  jumpWasPressed = jumpPressed;
+
+  // ---- ATTACK ----
+  if (player.attackCooldown > 0) player.attackCooldown--;
+  if (input.attack && player.attackCooldown === 0) {
+    player.attackTimer   = 10; // attack hitbox active for 10 frames
+    player.attackCooldown = 22;
+    sfx('attack');
+  }
+  if (player.attackTimer > 0) player.attackTimer--;
+
+  // ---- APPLY GRAVITY ----
+  // This is the entire physics engine. velY increases by GRAVITY each frame.
+  // When the player lands on a platform, velY is reset to 0.
+  player.wasOnGround = player.onGround;
+  player.onGround = false;
+  player.velY += GRAVITY;
+
+  // Terminal velocity — prevents falling too fast
+  if (player.velY > 14) player.velY = 14;
+
+  // Move player
+  player.x += player.velX;
+  player.y += player.velY;
+
+  // ---- PLATFORM COLLISION ----
+  platforms.forEach(p => resolvePlayerPlatform(p));
+
+  // ---- WORLD BOUNDS ----
+  let lvl = LEVELS[currentLevel];
+  if (player.x < 0) player.x = 0;
+  if (player.x + player.w > lvl.width) player.x = lvl.width - player.w;
+
+  // Fell off the bottom of the world
+  if (player.y > 400) {
+    diePlayer();
+    return;
+  }
+
+  // ---- INVINCIBILITY FRAMES ----
+  if (player.invincible > 0) player.invincible--;
+
+  // ---- ATTACK HITBOX vs ENEMIES ----
+  if (player.attackTimer > 0) {
+    let attackX = player.facingRight ? player.x + player.w : player.x - 28;
+    let hitbox  = { x: attackX, y: player.y + 4, w: 28, h: player.h - 8 };
+    enemies.forEach(e => {
+      if (!e.alive) return;
+      if (rectsOverlap(hitbox, e)) {
+        e.hp--;
+        e.flash = 8;
+        e.velX  = player.facingRight ? 3 : -3; // knockback
+        score  += 10;
+        sfx('hit-enemy');
+        spawnParticles(e.x + e.w/2, e.y + e.h/2, '#c0392b', 5, 4);
+        if (e.hp <= 0) {
+          e.alive = false;
+          score  += e.def.score;
+          spawnParticles(e.x + e.w/2, e.y + e.h/2, e.def.color, 10, 5);
+        }
+      }
+    });
+  }
+
+  // ---- UPDATE ENEMIES ----
+  enemies.forEach(e => {
+    if (!e.alive) return;
+
+    // Gravity
+    e.velY += GRAVITY;
+    if (e.velY > 14) e.velY = 14;
+
+    // Move
+    e.x += e.velX;
+    e.y += e.velY;
+    e.onGround = false;
+
+    // Platform collision for enemy
+    platforms.forEach(p => {
+      if (!rectsOverlap(e, p)) return;
+      let overlapTop = (e.y + e.h) - p.y;
+      let overlapLeft  = (e.x + e.w) - p.x;
+      let overlapRight = (p.x + p.w) - e.x;
+      let min = Math.min(overlapTop, overlapLeft, overlapRight);
+      if (min === overlapTop && e.velY >= 0) {
+        e.y = p.y - e.h;
+        e.velY = 0;
+        e.onGround = true;
+      } else if (min === overlapLeft) {
+        e.x = p.x - e.w; e.velX *= -1;
+      } else if (min === overlapRight) {
+        e.x = p.x + p.w; e.velX *= -1;
+      }
+    });
+
+    // Patrol — turn around at patrol boundaries
+    if (e.x < e.startX - e.patrolRange || e.x > e.startX + e.patrolRange) {
+      e.velX *= -1;
+    }
+
+    // World bounds
+    if (e.x < 0) { e.x = 0; e.velX *= -1; }
+    if (e.x + e.w > lvl.width) { e.x = lvl.width - e.w; e.velX *= -1; }
+
+    // Flash timer
+    if (e.flash > 0) e.flash--;
+
+    // ---- ENEMY vs PLAYER DAMAGE ----
+    if (player.invincible === 0 && rectsOverlap(player, e)) {
+      player.hp--;
+      player.invincible = 60; // 1 second of invincibility
+      player.velY = JUMP_FORCE * 0.5; // bounce off
+      player.velX = e.velX > 0 ? -4 : 4; // knocked back
+      sfx('hit-player');
+      spawnParticles(player.x + player.w/2, player.y + player.h/2, '#c0392b', 6, 3);
+      if (player.hp <= 0) { diePlayer(); return; }
+    }
+  });
+
+  // ---- COINS ----
+  let coinBox = { x: player.x + 2, y: player.y + 2, w: player.w - 4, h: player.h - 4 };
+  coins.forEach(c => {
+    if (c.collected) return;
+    if (rectsOverlap(coinBox, { x:c.x, y:c.y, w:c.w, h:c.h })) {
+      c.collected = true;
+      coinsTotal++;
+      score += 25;
+      sfx('coin');
+      spawnParticles(c.x + 5, c.y + 5, '#f0d080', 6, 3);
+    }
+  });
+
+  // ---- EXIT ----
+  if (!exit.reached && rectsOverlap(player, exit)) {
+    exit.reached = true;
+    sfx('level-complete');
+    setTimeout(() => {
+      if (currentLevel + 1 < LEVELS.length) {
+        currentLevel++;
+        loadLevel(currentLevel);
+      } else {
+        winGame();
+      }
+    }, 800);
+  }
+
+  // ---- PARTICLES ----
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x    += p.velX;
+    p.y    += p.velY;
+    p.velY += 0.2; // particles fall with gravity
+    p.life--;
+    p.size  = Math.max(0, p.size - 0.05);
+  });
+
+  // ---- CAMERA ----
+  // Camera follows the player, clamped to level bounds.
+  // We centre the player horizontally, with a small vertical offset.
+  let targetX = player.x - canvas.width / (2 * SCALE) + player.w / 2;
+  let targetY = player.y - canvas.height / (2 * SCALE) + player.h / 2 - 20;
+  camera.x = Math.max(0, Math.min(targetX, lvl.width  - canvas.width  / SCALE));
+  camera.y = Math.max(0, Math.min(targetY, 300 - canvas.height / SCALE));
+
+  // Smooth camera — lerp toward target (linear interpolation: move 15% toward target each frame)
+  // This means camera slides smoothly rather than snapping
+  camera.x += (targetX - camera.x) * 0.15;
+
+  // ---- UPDATE HUD ----
+  document.getElementById('hud-score').textContent  = score;
+  document.getElementById('hud-coins').textContent  = coinsTotal;
+  document.getElementById('hp-bar').style.width     = (player.hp / player.maxHp * 100) + '%';
+}
+
+// =====================================================================
+// DRAW — paints the entire scene every frame
+// Every frame we clear the canvas completely and redraw everything from scratch.
+// We use ctx.save() and ctx.restore() around the camera transform so we can
+// draw HUD elements without them being offset by the camera.
+// =====================================================================
+
+let frameCount = 0; // used for animations like bobbing coins
+
+function draw() {
+  frameCount++;
+  let lvl = LEVELS[currentLevel];
+
+  // Scale everything up by SCALE so the game looks right at any canvas size
+  ctx.save();
+  ctx.scale(SCALE, SCALE);
+
+  let W = canvas.width  / SCALE;
+  let H = canvas.height / SCALE;
+
+  // ---- BACKGROUND ----
+  // Simple gradient sky
+  let grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, lvl.bgColor[0]);
+  grad.addColorStop(1, lvl.bgColor[1]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle background stars / particles for atmosphere
+  ctx.fillStyle = 'rgba(201,168,76,0.15)';
+  for (let i = 0; i < 40; i++) {
+    let sx = ((i * 73 + 17) % lvl.width - camera.x * 0.2) % W; // parallax scrolling
+    let sy = (i * 47 + 11) % (H * 0.7);
+    if (sx < 0) sx += W;
+    ctx.fillRect(sx, sy, 1, 1);
+  }
+
+  // Apply camera transform — everything drawn after this is world-space
+  ctx.translate(-camera.x, -camera.y);
+
+  // ---- PLATFORMS ----
+  platforms.forEach(p => {
+    if (p.x + p.w < camera.x || p.x > camera.x + W) return; // skip off-screen
+
+    if (p.type === 'ground') {
+      // Ground: darker base, lighter top edge
+      ctx.fillStyle = lvl.groundColor;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = lvl.platformColor;
+      ctx.fillRect(p.x, p.y, p.w, 4);
+    } else {
+      // Floating platform: single colour with a lighter top strip
+      ctx.fillStyle = lvl.platformColor;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(p.x, p.y, p.w, 3);
+    }
+  });
+
+  // ---- EXIT PORTAL ----
+  if (!exit.reached) {
+    let pulse = Math.sin(frameCount * 0.08) * 0.3 + 0.7;
+    ctx.fillStyle = `rgba(201,168,76,${pulse * 0.3})`;
+    ctx.fillRect(exit.x - 4, exit.y - 4, exit.w + 8, exit.h + 8);
+    ctx.fillStyle = `rgba(201,168,76,${pulse * 0.8})`;
+    ctx.fillRect(exit.x, exit.y, exit.w, exit.h);
+    // Portal text
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 10px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('EXIT', exit.x + exit.w/2, exit.y + exit.h/2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  // ---- COINS ----
+  coins.forEach(c => {
+    if (c.collected) return;
+    let bob = Math.sin(frameCount * 0.08 + c.bobOffset) * 3;
+    let glow = Math.sin(frameCount * 0.1 + c.bobOffset) * 0.3 + 0.7;
+    ctx.fillStyle = `rgba(240,208,128,${glow * 0.25})`;
+    ctx.fillRect(c.x - 3, c.y + bob - 3, c.w + 6, c.h + 6);
+    ctx.fillStyle = '#f0d080';
+    ctx.fillRect(c.x, c.y + bob, c.w, c.h);
+    ctx.fillStyle = 'rgba(255,255,200,0.6)';
+    ctx.fillRect(c.x + 2, c.y + bob + 2, 3, 3);
+  });
+
+  // ---- ENEMIES ----
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    if (e.x + e.w < camera.x || e.x > camera.x + W) return;
+
+    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.def.color;
+    ctx.fillRect(e.x, e.y, e.w, e.h);
+
+    // Eyes — always face the direction of movement
+    let facing = e.velX >= 0 ? 1 : -1;
+    ctx.fillStyle = e.def.eyeColor;
+    let ex = facing > 0 ? e.x + e.w - 7 : e.x + 3;
+    ctx.fillRect(ex, e.y + 5, 4, 4);
+
+    // HP bar above enemy
+    if (e.hp < e.maxHp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(e.x, e.y - 5, e.w, 3);
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillRect(e.x, e.y - 5, e.w * (e.hp / e.maxHp), 3);
+    }
+  });
+
+  // ---- PLAYER ----
+  if (state === 'playing') {
+    // Blink during invincibility frames
+    let visible = player.invincible === 0 || Math.floor(frameCount / 4) % 2 === 0;
+    if (visible) {
+      // Body
+      ctx.fillStyle = player.invincible > 0 ? 'rgba(200,200,255,0.8)' : '#c8d4e0';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      // Cape / cloak depending on hero
+      ctx.fillStyle = '#4c1d95';
+      let capeX = player.facingRight ? player.x - 4 : player.x + player.w - 2;
+      ctx.fillRect(capeX, player.y + 4, 8, player.h - 8);
+
+      // Eyes
+      ctx.fillStyle = '#f0d080';
+      let eyeX = player.facingRight ? player.x + player.w - 7 : player.x + 3;
+      ctx.fillRect(eyeX, player.y + 8, 4, 4);
+
+      // Attack swing arc
+      if (player.attackTimer > 0) {
+        let alpha = player.attackTimer / 10;
+        ctx.fillStyle = `rgba(240,208,128,${alpha * 0.5})`;
+        let swingX = player.facingRight ? player.x + player.w : player.x - 28;
+        ctx.fillRect(swingX, player.y + 4, 28, player.h - 8);
+        ctx.fillStyle = `rgba(240,208,128,${alpha * 0.9})`;
+        let swordX = player.facingRight ? player.x + player.w : player.x - 24;
+        ctx.fillRect(swordX, player.y + 10, 4, player.h - 16);
+      }
+    }
+  }
+
+  // ---- PARTICLES ----
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  });
+  ctx.globalAlpha = 1;
+
+  // Restore from camera transform
+  ctx.restore();
+
+  // ---- HUD LEVEL NAME ----
+  ctx.save();
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.font = '10px Georgia';
+  ctx.textAlign = 'right';
+  ctx.fillText(lvl.name, W - 10, H - 8);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+// =====================================================================
+// GAME LOOP
+// requestAnimationFrame calls this function before the next screen repaint.
+// Inside, we call it again — so it loops forever at ~60fps.
+// =====================================================================
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// =====================================================================
+// STATE TRANSITIONS
+// =====================================================================
+function startGame() {
+  state        = 'playing';
+  score        = 0;
+  coinsTotal   = 0;
+  currentLevel = 0;
+  initAudio();
+  loadLevel(0);
+  document.getElementById('screen-start').style.display = 'none';
+  document.getElementById('screen-dead').style.display  = 'none';
+  document.getElementById('screen-win').style.display   = 'none';
+  document.getElementById('hud-score').textContent  = '0';
+  document.getElementById('hud-coins').textContent  = '0';
+}
+
+function diePlayer() {
+  state = 'dead';
+  sfx('die');
+  spawnParticles(player.x + player.w/2, player.y, '#c0392b', 14, 6);
+  document.getElementById('dead-sub').textContent =
+    'Score: ' + score + ' · Coins: ' + coinsTotal;
+  setTimeout(() => {
+    document.getElementById('screen-dead').style.display = 'flex';
+  }, 600);
+}
+
+function winGame() {
+  state = 'win';
+  document.getElementById('win-sub').textContent =
+    'Score: ' + score + ' · Coins collected: ' + coinsTotal + '  Well fought, hero.';
+  document.getElementById('screen-win').style.display = 'flex';
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+resizeCanvas();
+loadLevel(0); // load level data so the start screen has something to draw
+draw();       // draw one frame so the canvas isn't blank on the start screen
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
